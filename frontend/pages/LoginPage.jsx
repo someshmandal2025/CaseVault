@@ -1430,7 +1430,7 @@ export const LoginPage = () => {
                         <select
                           value={extractedOfficer.categoryKey || 'police_officer'}
                           onChange={(e) => handleRegCategoryChange(e.target.value)}
-                          className="w-full py-1.5 px-3 rounded-xl border border-slate-600 bg-slate-800 text-xs font-bold text-white focus:border-amber-400"
+                          className="w-full py-1.5 px-3 rounded-xl border border-slate-600 bg-slate-800 text-xs font-bold text-white focus:border-amber-400 cursor-pointer"
                         >
                           <option value="police_officer">👮 Officer</option>
                           <option value="senior_officer">⭐ Senior Officer</option>
@@ -1445,14 +1445,14 @@ export const LoginPage = () => {
                           <label className="text-[11px] font-bold text-slate-300">Rank / Designation *</label>
                           {!ocrConfidence.rank && (
                             <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> OCR could not confidently detect this field
+                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Verify rank
                             </span>
                           )}
                         </div>
                         <select
                           value={extractedOfficer.rank || getPermittedRanksForCategory(extractedOfficer.categoryKey)[0]}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, rank: e.target.value, designation: e.target.value })}
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold bg-slate-800 text-white transition ${
+                          className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold bg-slate-800 text-white transition cursor-pointer ${
                             !ocrConfidence.rank ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
                           }`}
                         >
@@ -1468,7 +1468,7 @@ export const LoginPage = () => {
                           <label className="text-[11px] font-bold text-slate-300">Officer Name *</label>
                           {!ocrConfidence.name && (
                             <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> OCR could not confidently detect this field
+                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Enter name
                             </span>
                           )}
                         </div>
@@ -1477,7 +1477,7 @@ export const LoginPage = () => {
                           required
                           value={extractedOfficer.name}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, name: e.target.value })}
-                          placeholder="Not detected — enter manually"
+                          placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. Suresh Sah' : 'e.g. SI Rahul Das'}
                           className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-semibold bg-slate-800 text-white transition ${
                             !ocrConfidence.name ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
                           }`}
@@ -1487,10 +1487,12 @@ export const LoginPage = () => {
                       {/* 4. Officer Badge / Batch ID * */}
                       <div>
                         <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Officer ID / Badge ID *</label>
+                          <label className="text-[11px] font-bold text-slate-300">
+                            {extractedOfficer.categoryKey === 'administrator' ? 'Administrator ID / Badge ID *' : extractedOfficer.categoryKey === 'legal_officer' ? 'Legal Officer ID / Batch ID *' : 'Officer ID / Badge ID *'}
+                          </label>
                           {!ocrConfidence.officerId && (
                             <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Not detected — enter manually
+                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Enter ID
                             </span>
                           )}
                         </div>
@@ -1499,20 +1501,22 @@ export const LoginPage = () => {
                           required
                           value={extractedOfficer.officerId}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, officerId: e.target.value.toUpperCase() })}
-                          placeholder="Not detected — enter manually"
+                          placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. WB-ADM-0001' : 'e.g. POL-8842'}
                           className={`w-full py-1.5 px-3 rounded-xl border font-mono text-xs sm:text-sm font-bold bg-slate-800 text-white transition ${
                             !ocrConfidence.officerId ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
                           }`}
                         />
                       </div>
 
-                      {/* 5. Police Station / Unit */}
+                      {/* 5. Police Station / Unit / Location */}
                       <div>
                         <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Police Station / Unit</label>
+                          <label className="text-[11px] font-bold text-slate-300">
+                            {extractedOfficer.categoryKey === 'administrator' ? 'Department / Unit / Location' : extractedOfficer.categoryKey === 'legal_officer' ? 'Court / Legal Unit' : 'Police Station / Unit'}
+                          </label>
                           {!ocrConfidence.policeStation && (
                             <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Not detected — enter manually
+                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Optional
                             </span>
                           )}
                         </div>
@@ -1520,7 +1524,7 @@ export const LoginPage = () => {
                           type="text"
                           value={extractedOfficer.policeStation}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, policeStation: e.target.value })}
-                          placeholder="Not detected — enter manually"
+                          placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. CASEVAULT Administration' : 'e.g. Siliguri Police Station'}
                           className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-medium bg-slate-800 text-white transition ${
                             !ocrConfidence.policeStation ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
                           }`}
@@ -1533,7 +1537,7 @@ export const LoginPage = () => {
                           <label className="text-[11px] font-bold text-slate-300">Official Email *</label>
                           {!ocrConfidence.email && (
                             <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Not detected — enter manually
+                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Enter email
                             </span>
                           )}
                         </div>
@@ -1545,28 +1549,31 @@ export const LoginPage = () => {
                             setExtractedOfficer({ ...extractedOfficer, email: e.target.value });
                             setOfficialEmail(e.target.value);
                           }}
-                          placeholder="e.g. rahul.das@police.wb.gov.in"
+                          placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. sureshkumarsah268@gmail.com' : 'e.g. officer@police.gov.in'}
                           className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-medium bg-slate-800 text-white transition ${
                             !ocrConfidence.email ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
                           }`}
                         />
                       </div>
 
-                      {/* 7. Phone Number */}
+                      {/* 7. Phone Number (+91 format) */}
                       <div className="sm:col-span-2">
                         <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Phone Number</label>
+                          <label className="text-[11px] font-bold text-slate-300">Phone Number (+91 format)</label>
                           {!ocrConfidence.phone && (
                             <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> OCR could not confidently detect this field
+                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Optional
                             </span>
                           )}
                         </div>
                         <input
                           type="tel"
                           value={extractedOfficer.phone}
-                          onChange={(e) => setExtractedOfficer({ ...extractedOfficer, phone: e.target.value })}
-                          placeholder="e.g. +91 98302 34568"
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setExtractedOfficer({ ...extractedOfficer, phone: raw });
+                          }}
+                          placeholder="e.g. +91 74787 54133"
                           className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-medium bg-slate-800 text-white transition ${
                             !ocrConfidence.phone ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
                           }`}

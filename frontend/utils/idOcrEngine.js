@@ -332,15 +332,16 @@ export const generateSampleBadgeCardFile = (sampleType = 'si_rahul') => {
       uniformColor: '#8C6734',
       capColor: '#164A73'
     };
-  } else if (sampleType === 'sysadmin_arun') {
+  } else if (sampleType === 'sysadmin_suresh' || sampleType === 'sysadmin_arun') {
     badgeData = {
-      badgeId: 'SYS-ADM-9901',
-      name: 'Arun Kumar',
+      badgeId: 'WB-ADM-0001',
+      name: 'Suresh Sah',
       rank: 'System Administrator',
-      policeStation: 'IT & Cyber Directorate',
-      state: 'CASEVAULT ADMIN CELL',
-      email: 'arun.kumar@casevault.gov.in',
-      phone: '+91 98765 43210',
+      designation: 'System Administrator',
+      policeStation: 'CASEVAULT Administration',
+      state: 'CASEVAULT ADMINISTRATOR IDENTITY CARD',
+      email: 'sureshkumarsah268@gmail.com',
+      phone: '+91 74787 54133',
       color: '#064E3B',
       uniformColor: '#1E293B',
       capColor: '#064E3B'
