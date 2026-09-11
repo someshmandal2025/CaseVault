@@ -1,7 +1,7 @@
 /**
  * CASEVAULT OCR Text Parser
  * 
- * Modular label-based entity extraction for official law enforcement and judicial ID cards.
+ * Modular label-based entity extraction for official law enforcement, judicial, and administration ID cards.
  * Recognizes diverse card layouts, label spellings, and unstructured text lines.
  */
 
@@ -14,15 +14,15 @@ export const normalizePhoneNumber = (rawPhone) => {
   if (!rawPhone) return '';
   const digits = rawPhone.replace(/[^0-9]/g, '');
   if (digits.length === 10) {
-    return `+91 ${digits.slice(0, 5)}${digits.slice(5)}`;
+    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
   }
   if (digits.length === 12 && digits.startsWith('91')) {
     const num = digits.slice(2);
-    return `+91 ${num.slice(0, 5)}${num.slice(5)}`;
+    return `+91 ${num.slice(0, 5)} ${num.slice(5)}`;
   }
   if (digits.length > 10) {
     const num = digits.slice(-10);
-    return `+91 ${num.slice(0, 5)}${num.slice(5)}`;
+    return `+91 ${num.slice(0, 5)} ${num.slice(5)}`;
   }
   return rawPhone.trim();
 };
@@ -43,7 +43,7 @@ const cleanValue = (str) => {
  */
 const isDecorativeOrHeaderTitle = (str) => {
   if (!str) return false;
-  return /^(?:LEGAL\s*OFFICER\s*IDENTITY\s*CARD|OFFICE\s*IDENTITY\s*CARD|POLICE\s*IDENTITY\s*CARD|GOVERNMENT\s*OF\s*INDIA|IDENTITY\s*CARD|ID\s*CARD)$/i.test(str.trim());
+  return /^(?:ADMINISTRATOR\s*IDENTITY\s*CARD|LEGAL\s*OFFICER\s*IDENTITY\s*CARD|OFFICE\s*IDENTITY\s*CARD|POLICE\s*IDENTITY\s*CARD|GOVERNMENT\s*OF\s*INDIA|IDENTITY\s*CARD|ID\s*CARD)$/i.test(str.trim());
 };
 
 /**
@@ -85,10 +85,11 @@ export const parseIdCardText = (rawText) => {
 
   // ================= 1. CARD TITLE & CATEGORY AUTO-DETECTION =================
   let isExplicitLegalOfficerCard = /LEGAL\s*OFFICER\s*(?:IDENTITY\s*CARD|CARD|DEPT)?/i.test(text);
+  let isExplicitAdminCard = /ADMINISTRATOR\s*(?:IDENTITY\s*CARD|CARD|DEPT)?/i.test(text);
 
   // ================= 2. REGEX EXTRACTORS (FULL TEXT SEARCH) =================
 
-  // 2A. Email Address Extraction (e.g. asits1299@gmail.com)
+  // 2A. Email Address Extraction (e.g. sureshkumarsah268@gmail.com)
   const emailRegex = /\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/i;
   const emailMatch = text.match(emailRegex);
   if (emailMatch) {
@@ -96,7 +97,7 @@ export const parseIdCardText = (rawText) => {
     res.confidence.email = true;
   }
 
-  // 2B. Phone Number Extraction (e.g. +91 7679432990 or 7679432990)
+  // 2B. Phone Number Extraction (e.g. +91 7478754133 or 7478754133)
   const phoneRegex = /(?:\+?91[\s-]?)?([6-9]\d{9})\b|\b([6-9]\d{4}[\s-]?\d{5})\b/;
   const phoneMatch = text.match(phoneRegex);
   if (phoneMatch) {
@@ -112,10 +113,10 @@ export const parseIdCardText = (rawText) => {
     const line = lines[i];
     const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
 
-    // --- A. OFFICER ID / BADGE ID ---
-    // Labels: "Officer Batch ID:", "Batch ID:", "Officer ID:", "Badge ID:", "ID No:"
+    // --- A. OFFICER ID / ADMINISTRATOR ID / BADGE ID ---
+    // Labels: "Administrator ID:", "Admin ID:", "Officer Batch ID:", "Batch ID:", "Officer ID:", "Badge ID:", "ID No:"
     if (!res.officerId) {
-      const sameLineIdRx = /(?:Officer\s*Batch\s*ID|Batch\s*ID|Officer\s*ID|Badge\s*ID|ID\s*No\.?)[\s.:#-]+([A-Z0-9][A-Z0-9/\s.-]{1,20})/i;
+      const sameLineIdRx = /(?:Administrator\s*ID|Admin\s*ID|Officer\s*Batch\s*ID|Batch\s*ID|Officer\s*ID|Badge\s*ID|ID\s*No\.?)[\s.:#-]+([A-Z0-9][A-Z0-9/\s.-]{1,20})/i;
       const m = line.match(sameLineIdRx);
       if (m) {
         const candidate = cleanValue(m[1]).toUpperCase();
@@ -124,7 +125,7 @@ export const parseIdCardText = (rawText) => {
           res.confidence.officerId = true;
         }
       } else {
-        const labelOnlyIdRx = /^(?:Officer\s*Batch\s*ID|Batch\s*ID|Officer\s*ID|Badge\s*ID|ID\s*No\.?)[\s.:#-]*$/i;
+        const labelOnlyIdRx = /^(?:Administrator\s*ID|Admin\s*ID|Officer\s*Batch\s*ID|Batch\s*ID|Officer\s*ID|Badge\s*ID|ID\s*No\.?)[\s.:#-]*$/i;
         if (labelOnlyIdRx.test(line) && nextLine) {
           const candidate = cleanValue(nextLine).toUpperCase();
           if (candidate.length >= 2 && !/name|rank|designation|email|phone/i.test(candidate)) {
@@ -142,7 +143,7 @@ export const parseIdCardText = (rawText) => {
       const m = line.match(sameLineNameRx);
       if (m) {
         const candidate = cleanValue(m[1]);
-        if (!/police|government|india|department|badge|rank|station|id|legal|officer/i.test(candidate)) {
+        if (!/police|government|india|department|badge|rank|station|id|legal|officer|administrator/i.test(candidate)) {
           res.name = candidate;
           res.confidence.name = true;
         }
@@ -159,7 +160,7 @@ export const parseIdCardText = (rawText) => {
     }
 
     // --- C. DESIGNATION (Explicit) ---
-    // Label: "Designation:" (e.g. Asst. Public Prosecutor (APP))
+    // Label: "Designation:" (e.g. System Administrator, Asst. Public Prosecutor (APP))
     if (!rawExtractedDesignation) {
       const desigRx = /(?:Designation|Desig|Post)[\s.:#-]+([A-Za-z0-9\s.()-]{2,45})/i;
       const m = line.match(desigRx);
@@ -169,7 +170,7 @@ export const parseIdCardText = (rawText) => {
     }
 
     // --- D. RANK (Explicit) ---
-    // Label: "Rank:" (e.g. Legal officer)
+    // Label: "Rank:" (e.g. System Administrator, Legal officer)
     if (!rawExtractedRank) {
       const rankRx = /(?:Rank)[\s.:#-]+([A-Za-z0-9\s.-]{2,45})/i;
       const m = line.match(rankRx);
@@ -178,13 +179,14 @@ export const parseIdCardText = (rawText) => {
       }
     }
 
-    // --- E. POLICE STATION / UNIT (For police cards) ---
+    // --- E. POLICE STATION / DEPARTMENT / OFFICE LOCATION ---
+    // Labels: "Department / Unit:", "Office / Location:", "Police Station / Unit:", "Police Station:"
     if (!res.policeStation) {
-      const psRx = /(?:Police\s*Station\s*\/\s*Unit|Police\s*Station|Station|Thana|P\.?S\.?|Unit|Department)[\s.:#-]+([A-Za-z\s.-]{3,40})/i;
+      const psRx = /(?:Police\s*Station\s*\/\s*Unit|Police\s*Station|Station|Thana|P\.?S\.?|Department\s*\/\s*Unit|Office\s*\/\s*Location|Department|Unit|Location)[\s.:#-]+([A-Za-z0-9\s.-]{3,45})/i;
       const m = line.match(psRx);
       if (m) {
         let candidate = cleanValue(m[1]);
-        if (candidate && !/badge|id|name|rank|email/i.test(candidate)) {
+        if (candidate && !/badge|id|name|rank|email|phone/i.test(candidate)) {
           res.policeStation = candidate;
           res.confidence.policeStation = true;
         }
@@ -192,11 +194,16 @@ export const parseIdCardText = (rawText) => {
     }
   }
 
-  // ================= 4. RANK & DESIGNATION NORMALIZATION =================
+  // ================= 4. RANK & CATEGORY NORMALIZATION =================
   let chosenRankString = rawExtractedDesignation || rawExtractedRank || text;
 
-  // Handle explicit Legal Officer Asst. Public Prosecutor (APP) normalization rule
-  if (/(?:asst\.?\s*public\s*prosecutor|assistant\s*public\s*prosecutor|\bapp\b)/i.test(chosenRankString) || (isExplicitLegalOfficerCard && /prosecutor/i.test(chosenRankString))) {
+  if (isExplicitAdminCard || /(?:system\s*administrator|system\s*admin|administrator)/i.test(chosenRankString)) {
+    res.rank = 'System Administrator';
+    res.designation = 'System Administrator';
+    res.categoryKey = 'administrator';
+    res.categoryLabel = 'Administrator';
+    res.confidence.rank = true;
+  } else if (/(?:asst\.?\s*public\s*prosecutor|assistant\s*public\s*prosecutor|\bapp\b)/i.test(chosenRankString) || (isExplicitLegalOfficerCard && /prosecutor/i.test(chosenRankString))) {
     res.rank = 'Assistant Public Prosecutor (APP)';
     res.designation = 'Assistant Public Prosecutor (APP)';
     res.categoryKey = 'legal_officer';
@@ -204,8 +211,8 @@ export const parseIdCardText = (rawText) => {
     res.confidence.rank = true;
   } else {
     const mapped = mapRankToCategoryAndRank(chosenRankString);
-    res.categoryKey = isExplicitLegalOfficerCard ? 'legal_officer' : mapped.categoryKey;
-    res.categoryLabel = isExplicitLegalOfficerCard ? 'Legal Officer' : mapped.categoryLabel;
+    res.categoryKey = isExplicitAdminCard ? 'administrator' : isExplicitLegalOfficerCard ? 'legal_officer' : mapped.categoryKey;
+    res.categoryLabel = isExplicitAdminCard ? 'Administrator' : isExplicitLegalOfficerCard ? 'Legal Officer' : mapped.categoryLabel;
     res.rank = mapped.rank;
     res.designation = mapped.rank;
     if (res.rank) res.confidence.rank = true;
@@ -214,7 +221,7 @@ export const parseIdCardText = (rawText) => {
   // ================= 5. BADGE ID FALLBACK =================
   if (!res.officerId) {
     const badgePattern = text.match(/\b([A-Z]{2,4}[- /]?[A-Z0-9]{2,5}[- /]?[0-9]{3,6})\b/i);
-    if (badgePattern && !/^(?:ENG|JPG|PNG|PDF|GOVT|POLICE|LEGAL)$/i.test(badgePattern[1])) {
+    if (badgePattern && !/^(?:ENG|JPG|PNG|PDF|GOVT|POLICE|LEGAL|ADM)$/i.test(badgePattern[1])) {
       res.officerId = badgePattern[1].toUpperCase().replace(/\s+/g, '-');
       res.confidence.officerId = true;
     }
