@@ -1,0 +1,6 @@
+# CASEVAULT Django Backend Dependencies
+Django>=5.0,<7.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+python-dotenv>=1.0.0
+pymongo>=4.6.0

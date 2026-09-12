@@ -40,14 +40,14 @@ import {
   evaluateFieldConfidence
 } from '../utils/idOcrEngine';
 
-export const CATEGORY_RANKS = {
+const CATEGORY_RANKS = {
   police_officer: ['Constable', 'Head Constable', 'ASI', 'SI'],
-  senior_officer: ['Inspector', 'ACP / DSP', 'Addl. SP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP', 'IPS'],
+  senior_officer: ['Inspector', 'ACP / DSP', 'Addl. SP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP'],
   legal_officer: ['Legal Officer', 'Public Prosecutor', 'Legal Advisor', 'Law Officer'],
   administrator: ['System Administrator', 'Administrative Officer', 'Department Administrator', 'IT / System Manager']
 };
 
-export const CATEGORY_BADGES = {
+const CATEGORY_BADGES = {
   police_officer: { label: 'Officer', icon: '👮', color: 'bg-blue-100 text-blue-900 border-blue-200' },
   senior_officer: { label: 'Senior Officer', icon: '⭐', color: 'bg-amber-100 text-amber-900 border-amber-300' },
   legal_officer: { label: 'Legal Officer', icon: '⚖️', color: 'bg-purple-100 text-purple-900 border-purple-200' },
@@ -334,8 +334,8 @@ export const UsersPage = () => {
   };
 
   // Step 2: Admin clicks "Create Officer" in Confirmation Modal -> Creates record
-  const handleFinalCreateOfficer = () => {
-    const result = addUser(newUserData);
+  const handleFinalCreateOfficer = async () => {
+    const result = await addUser(newUserData);
     if (result && result.success) {
       setIsConfirmAddModalOpen(false);
       setIsAddModalOpen(false);
@@ -570,14 +570,24 @@ export const UsersPage = () => {
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <div className="max-w-xs mx-auto space-y-2">
+                    <div className="max-w-sm mx-auto space-y-3">
                       <Users className="w-10 h-10 text-slate-300 mx-auto" />
-                      <div className="font-bold text-slate-700 text-sm">No officers found</div>
-                      <p className="text-xs text-slate-400">
+                      <div className="font-bold text-slate-800 text-base">No officers added yet.</div>
+                      <p className="text-xs text-slate-500">
                         {searchQuery || roleFilter !== 'ALL' || rankFilter !== 'ALL'
                           ? 'No authorized officers match your current search or filter criteria.'
-                          : 'No officer accounts enrolled yet. Click "+ Add Officer" to enroll an officer.'}
+                          : 'Enroll registered officers to manage law enforcement credentials and access roles.'}
                       </p>
+                      <button
+                        onClick={() => {
+                          resetFormAndOcr();
+                          setIsAddModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0043a8] text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 text-amber-300" />
+                        <span>+ Add Officer</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -720,9 +730,9 @@ export const UsersPage = () => {
         {/* 2. MOBILE CARD VIEW (Visible on mobile screens < md breakpoint) */}
         <div className="block md:hidden divide-y divide-slate-100">
           {filteredUsers.length === 0 ? (
-            <div className="py-8 px-4 text-center text-slate-400">
-              <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <div className="font-bold text-slate-700 text-xs">No officers found</div>
+            <div className="py-8 px-4 text-center text-slate-400 space-y-2">
+              <Users className="w-8 h-8 text-slate-300 mx-auto" />
+              <div className="font-bold text-slate-800 text-sm">No officers added yet.</div>
             </div>
           ) : (
             filteredUsers.map((usr) => {

@@ -61,9 +61,9 @@ export const SettingsPage = ({ defaultTab }) => {
   }, [defaultTab, activeSettingsTab]);
 
   // Profile Form State
-  const [profileName, setProfileName] = useState(currentUser?.name || 'Inspector Rajesh Sharma');
+  const [profileName, setProfileName] = useState(currentUser?.name || 'SI Shivam Kumar Singh');
   const [profilePhone, setProfilePhone] = useState(currentUser?.phone || '+91 98301 24567');
-  const [profileEmail, setProfileEmail] = useState(currentUser?.email || 'rajesh.sharma@gmail.com');
+  const [profileEmail, setProfileEmail] = useState(currentUser?.email || 'shivam.singh@police.gov.in');
   const [profileAvatar, setProfileAvatar] = useState(currentUser?.avatar || '👮');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 

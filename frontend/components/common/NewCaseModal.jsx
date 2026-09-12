@@ -21,9 +21,20 @@ export const NewCaseModal = () => {
     closeNewCaseModal, 
     addCase, 
     currentUser, 
+    users = [],
     showToast, 
     navigate 
   } = useApp();
+
+  const registeredOfficerOptions = Array.from(
+    new Set([
+      ...(currentUser?.name ? [currentUser.name] : []),
+      ...users.map(u => u.name).filter(Boolean),
+      'SI Shivam Kumar Singh',
+      'Insp. Karan Kumar',
+      'SI Somesh Mandal'
+    ])
+  );
 
   const [formData, setFormData] = useState({
     title: '',
@@ -48,13 +59,14 @@ export const NewCaseModal = () => {
   useEffect(() => {
     if (isNewCaseModalOpen) {
       const randomFIR = `FIR/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`;
+      const defaultIO = currentUser?.name || (users.length > 0 ? users[0].name : 'SI Shivam Kumar Singh');
       setFormData({
         title: '',
         caseType: 'Theft',
         firNumber: randomFIR,
         dateOpened: new Date().toISOString().split('T')[0],
-        policeStation: currentUser?.policeStation || 'Kolkata Cyber PS',
-        investigatingOfficer: currentUser?.name || 'Insp. Rajesh Sharma',
+        policeStation: currentUser?.policeStation || (users.length > 0 ? users[0].policeStation : 'Siliguri Police Station'),
+        investigatingOfficer: defaultIO,
         assistingOfficer: 'Const. S. Dey',
         status: 'Open',
         priority: 'Medium',
@@ -66,7 +78,7 @@ export const NewCaseModal = () => {
       });
       setErrors({});
     }
-  }, [isNewCaseModalOpen, currentUser]);
+  }, [isNewCaseModalOpen, currentUser, users]);
 
   // Handle ESC key press to close modal
   useEffect(() => {
@@ -275,15 +287,47 @@ export const NewCaseModal = () => {
                 Investigating Officer (I.O.) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3 z-10 pointer-events-none" />
                 <input
                   type="text"
+                  list="registered-io-list-newcase"
                   value={formData.investigatingOfficer}
                   onChange={(e) => setFormData({ ...formData, investigatingOfficer: e.target.value })}
-                  placeholder="e.g. Insp. Rajesh Sharma"
+                  placeholder="Select or enter Officer name..."
                   className="w-full pl-9 pr-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-blue-900"
                 />
+                <datalist id="registered-io-list-newcase">
+                  {registeredOfficerOptions.map((offName, idx) => (
+                    <option key={idx} value={offName} />
+                  ))}
+                </datalist>
               </div>
+              {registeredOfficerOptions.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Registered Officers:</span>
+                  {registeredOfficerOptions.map((offName, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        const matchedUser = users.find(u => u.name === offName);
+                        setFormData(prev => ({
+                          ...prev,
+                          investigatingOfficer: offName,
+                          policeStation: matchedUser?.policeStation || prev.policeStation
+                        }));
+                      }}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition active:scale-95 cursor-pointer ${
+                        formData.investigatingOfficer === offName
+                          ? 'bg-blue-900 text-white border-blue-950 shadow-xs'
+                          : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200'
+                      }`}
+                    >
+                      + {offName}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>

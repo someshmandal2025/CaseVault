@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_CASES, INITIAL_DOCUMENTS, INITIAL_AUDIT_LOGS, INITIAL_USERS } from '../../database/seeds/mockData';
 import { computeSHA256, generateDocId, generateCaseId, formatDateTime } from '../utils/cryptoUtils';
 
-export const normalizeUser = (u) => {
+const normalizeUser = (u) => {
   if (!u || typeof u !== 'object') return u;
 
   const officerId = (
@@ -39,7 +39,7 @@ export const normalizeUser = (u) => {
   };
 };
 
-export const isSameUser = (u1, u2) => {
+const isSameUser = (u1, u2) => {
   if (!u1 || !u2) return false;
 
   if (u1.id !== undefined && u1.id !== null && u2.id !== undefined && u2.id !== null) {
@@ -63,7 +63,7 @@ export const isSameUser = (u1, u2) => {
   return false;
 };
 
-export const deduplicateUsers = (userList) => {
+const deduplicateUsers = (userList) => {
   if (!Array.isArray(userList)) return [];
   const result = [];
 
@@ -121,47 +121,31 @@ export const AppProvider = ({ children }) => {
 
   // Core Data Stores
   const [cases, setCases] = useState(() => {
-    if (INITIAL_CASES.length === 0) {
-      localStorage.setItem('casevault_cases', JSON.stringify([]));
-      return [];
-    }
     const saved = localStorage.getItem('casevault_cases');
-    if (!saved) return INITIAL_CASES;
+    if (!saved) return [];
     try {
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : INITIAL_CASES;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return INITIAL_CASES;
+      return [];
     }
   });
+
 
   const [documents, setDocuments] = useState(() => {
     const saved = localStorage.getItem('casevault_documents');
     if (!saved) return INITIAL_DOCUMENTS;
     try {
       const parsed = JSON.parse(saved);
-      return parsed.filter(d => !d.caseId?.startsWith('CASE-102'));
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_DOCUMENTS;
     } catch {
-      return [];
+      return INITIAL_DOCUMENTS;
     }
   });
 
-  const [auditLogs, setAuditLogs] = useState(() => {
-    const saved = localStorage.getItem('casevault_audit_logs');
-    if (!saved) return INITIAL_AUDIT_LOGS;
-    try {
-      const parsed = JSON.parse(saved);
-      return parsed.filter(l => !l.caseId?.startsWith('CASE-102'));
-    } catch {
-      return [];
-    }
-  });
+  const [auditLogs, setAuditLogs] = useState([]);
 
   const [users, setUsers] = useState(() => {
-    if (INITIAL_USERS.length === 0) {
-      localStorage.setItem('casevault_users_list', JSON.stringify([]));
-      return [];
-    }
     const saved = localStorage.getItem('casevault_users_list');
     if (!saved) return deduplicateUsers(INITIAL_USERS);
     try {
@@ -215,9 +199,7 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('casevault_documents', JSON.stringify(documents));
   }, [documents]);
 
-  useEffect(() => {
-    localStorage.setItem('casevault_audit_logs', JSON.stringify(auditLogs));
-  }, [auditLogs]);
+
 
   useEffect(() => {
     const cleanUsers = deduplicateUsers(users);
@@ -268,11 +250,83 @@ export const AppProvider = ({ children }) => {
     showToast(`Logged in successfully as ${normUser.name} (${normUser.roleLabel || normUser.role})`, 'success');
   };
 
+  const fetchCasesFromBackend = async () => {
+    try {
+      const user = currentUser || (localStorage.getItem('casevault_user') ? JSON.parse(localStorage.getItem('casevault_user')) : null);
+      const headers = { 'Content-Type': 'application/json' };
+      if (user && (user.officer_id || user.officerId)) {
+        headers['X-Officer-ID'] = user.officer_id || user.officerId;
+      }
+      if (user && user.email) {
+        headers['X-User-Email'] = user.email;
+      }
+
+      const response = await fetch('http://localhost:8000/api/cases/', { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.cases)) {
+          const mappedCases = data.cases.map(c => ({
+            ...c,
+            id: c.case_id || c.id,
+            firNumber: c.fir_number || c.case_id,
+            title: c.title || 'Untitled Case',
+            caseType: c.case_type || 'Investigation',
+            policeStation: c.police_station || 'Siliguri Police Station',
+            investigatingOfficer: c.investigating_officer || c.investigating_officer_id || 'Officer',
+            createdDate: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            lastUpdated: c.updated_at ? c.updated_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            status: c.status || 'OPEN',
+            priority: c.priority || 'MEDIUM',
+            description: c.description || '',
+            documentCount: c.document_count || 0,
+            tags: [c.case_type || 'Investigation', c.status || 'OPEN']
+          }));
+          setCases(mappedCases);
+          return mappedCases;
+        }
+      }
+    } catch (err) {
+      console.warn('[CASEVAULT Cases] Could not fetch cases from Django backend:', err);
+    }
+    return [];
+  };
+
+  const fetchOfficersFromBackend = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/officers/');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.officers)) {
+          const normalized = data.officers.map(u => normalizeUser(u));
+          setUsers(deduplicateUsers(normalized));
+          return normalized;
+        }
+      }
+    } catch (err) {
+      console.warn('[CASEVAULT Officers] Could not fetch officers from Django backend:', err);
+    }
+    return [];
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchOfficersFromBackend();
+      fetchCasesFromBackend();
+    }
+  }, [isAuthenticated]);
+
+
   const loginWithCredentials = async (username, password, selectedRole) => {
     const cleanUser = username ? username.trim().toLowerCase() : '';
     const cleanPass = password ? password.trim() : '';
 
-    // Attempt Django REST API authentication
+    if (!cleanUser || !cleanPass) {
+      const err = 'Please enter both username/email and password.';
+      showToast(err, 'error');
+      return { success: false, error: err };
+    }
+
+    // Direct DRF REST API Authentication
     try {
       const response = await fetch('http://localhost:8000/api/login/', {
         method: 'POST',
@@ -280,69 +334,58 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify({ email: cleanUser, password: cleanPass })
       });
       const data = await response.json();
+
       if (response.ok && data.success) {
         const normUser = normalizeUser(data.user);
+
+        // Enforce account status check
+        if (normUser.status === 'Disabled') {
+          const disabledMsg = 'This officer account is deactivated. Contact Administrator.';
+          showToast(disabledMsg, 'error');
+          return { success: false, error: disabledMsg };
+        }
+
         setCurrentUser(normUser);
         setIsAuthenticated(true);
+        localStorage.setItem('casevault_user', JSON.stringify(normUser));
+        if (data.token) {
+          localStorage.setItem('casevault_auth_token', data.token);
+        }
         setCurrentPage('dashboard');
 
-        // Safely sync with users list without duplicating or creating new user
-        setUsers(prev => syncAuthenticatedUserInList(prev, normUser));
+        // Fetch authoritative officer list from backend
+        fetchOfficersFromBackend();
 
         showToast(data.message || `Welcome back, ${normUser.name}`, 'success');
         logActivity({
           action: 'Officer Login',
           actionBadge: 'AUTH',
-          details: `Officer ${normUser.name} (${normUser.officerId || normUser.email}) logged in via Django REST API.`
+          details: `Officer ${normUser.name} (${normUser.officerId || normUser.email}) authenticated via Django REST Framework.`
         });
         return { success: true, user: normUser };
+      } else {
+        // Django API returned an explicit authentication rejection
+        let errMsg = 'Access Denied: Invalid credentials.';
+        if (data.message) {
+          errMsg = data.message;
+        } else if (data.errors) {
+          if (typeof data.errors === 'string') {
+            errMsg = data.errors;
+          } else if (typeof data.errors === 'object') {
+            const firstKey = Object.keys(data.errors)[0];
+            const val = data.errors[firstKey];
+            errMsg = Array.isArray(val) ? val[0] : String(val);
+          }
+        }
+        showToast(errMsg, 'error');
+        return { success: false, error: errMsg };
       }
     } catch (err) {
-      console.warn('[CASEVAULT Auth] Backend API unreachable, using local storage fallback:', err);
+      console.error('[CASEVAULT Auth] Backend API connection error:', err);
+      const connErr = 'Unable to connect to CASEVAULT Authentication Server (Django backend). Please check server status.';
+      showToast(connErr, 'error');
+      return { success: false, error: connErr };
     }
-
-    // Local Fallback Login (matching existing user in state)
-    const matched = users.find(u => {
-      return isSameUser(u, {
-        email: cleanUser,
-        officerId: cleanUser,
-        username: cleanUser,
-        name: cleanUser
-      });
-    });
-
-    if (matched) {
-      if (matched.status === 'Disabled') {
-        const disabledMsg = 'This officer account is deactivated. Contact Administrator.';
-        showToast(disabledMsg, 'error');
-        return { success: false, error: disabledMsg };
-      }
-
-      if (matched.password && matched.password !== cleanPass) {
-        const passErr = 'Invalid officer credentials. Incorrect password.';
-        showToast(passErr, 'error');
-        return { success: false, error: passErr };
-      }
-
-      const normMatched = normalizeUser(matched);
-      setCurrentUser(normMatched);
-      setIsAuthenticated(true);
-      setCurrentPage('dashboard');
-      showToast(`Welcome back, ${normMatched.name}`, 'success');
-      logActivity({
-        action: 'Officer Login',
-        actionBadge: 'AUTH',
-        details: `Officer ${normMatched.name} (${normMatched.officerId || normMatched.email}) logged in.`
-      });
-      return { success: true, user: normMatched };
-    }
-
-    const errorMsg = 'Access Denied: Unregistered officer account. Only registered accounts or administrator-enrolled officers may login.';
-    showToast(errorMsg, 'error');
-    return {
-      success: false,
-      error: errorMsg
-    };
   };
 
   const requestForgotPassword = async (email) => {
@@ -452,12 +495,9 @@ export const AppProvider = ({ children }) => {
     password,
     avatar
   }) => {
-    const cleanEmail = email || `${(officerId || 'officer').toLowerCase().replace(/[^a-z0-9]/g, '.')}@police.gov.in`;
+    const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPass = password || 'Officer@123';
 
-    let registeredUser = null;
-
-    // Send registration request to Django REST API
     try {
       const response = await fetch('http://localhost:8000/api/register/', {
         method: 'POST',
@@ -468,80 +508,55 @@ export const AppProvider = ({ children }) => {
           password: cleanPass,
           confirm_password: cleanPass,
           officer_id: officerId,
-          rank: rank || 'Sub-Inspector',
+          rank: rank || 'Constable',
           police_station: policeStation || 'Siliguri Police Station',
           role: role || 'police_officer',
           avatar: avatar || '👮'
         })
       });
+
       const data = await response.json();
+
       if (response.ok && data.success) {
-        registeredUser = data.user;
+        const newUser = normalizeUser(data.user);
+        fetchOfficersFromBackend();
+
+        logActivity({
+          action: 'Officer ID Verified',
+          actionBadge: 'verify',
+          details: `${idType || 'Police ID'} (${newUser.officerId}) verified for ${newUser.name} (${newUser.rank}).`
+        });
+
+        logActivity({
+          action: 'Role Assigned',
+          actionBadge: 'add',
+          details: `Assigned role '${newUser.roleLabel || 'Police Officer'}' with permissions.`
+        });
+
+        showToast(`Officer account registered for ${newUser.name} (${newUser.roleLabel || 'Police Officer'})`, 'success');
+        return { success: true, user: newUser };
+      } else {
+        let errMessage = 'Officer registration rejected by backend server.';
+        if (data.message) {
+          errMessage = data.message;
+        } else if (data.errors) {
+          if (typeof data.errors === 'string') {
+            errMessage = data.errors;
+          } else if (typeof data.errors === 'object') {
+            const firstKey = Object.keys(data.errors)[0];
+            const val = data.errors[firstKey];
+            errMessage = Array.isArray(val) ? val[0] : String(val);
+          }
+        }
+        showToast(errMessage, 'error');
+        return { success: false, error: errMessage };
       }
     } catch (err) {
-      console.warn('[CASEVAULT Register] Django API unreachable during registration:', err);
+      console.error('[CASEVAULT Register] Django API error:', err);
+      const connErr = 'Unable to connect to CASEVAULT Registration Server (Django backend).';
+      showToast(connErr, 'error');
+      return { success: false, error: connErr };
     }
-
-    const newUser = registeredUser || {
-      id: `usr-${Date.now().toString().slice(-4)}`,
-      name: name || 'Officer',
-      officerId: officerId || 'POL-NEW-01',
-      rank: rank || 'Sub-Inspector',
-      department: department || 'General Policing',
-      policeStation: policeStation || 'Siliguri Police Station',
-      role: role || 'police_officer',
-      roleLabel: roleLabel || 'Police Officer',
-      email: cleanEmail,
-      phone: phone || '',
-      password: cleanPass,
-      emailVerified: true,
-      pinHash: pinHash || null,
-      status: 'Active',
-      permissions: permissions || ['Read', 'Upload', 'Edit'],
-      passkeyDevice: passkeyDevice || null,
-      idType: idType || 'Police ID',
-      hasPin: true,
-      lastActive: 'Just now',
-      avatar: avatar || (role === 'senior_officer' ? '👮‍♂️' : role === 'legal_officer' ? '⚖️' : role === 'administrator' ? '🛡️' : '👮')
-    };
-
-    setUsers(prev => [newUser, ...prev]);
-
-    // Record formal audit trail events
-    logActivity({
-      action: 'Officer ID Verified',
-      actionBadge: 'verify',
-      details: `${idType || 'Police ID'} (${newUser.officerId}) verified for ${newUser.name} (${newUser.rank}).`
-    });
-
-    logActivity({
-      action: 'CONTACT_REGISTERED',
-      actionBadge: 'add',
-      details: `Official email ${newUser.email} and contact ${phone || 'N/A'} registered for officer ${newUser.officerId}.`
-    });
-
-    logActivity({
-      action: 'PASSWORD_ESTABLISHED',
-      actionBadge: 'edit',
-      details: `Encrypted Password security (PBKDF2/SHA-256 hashed) established for ${newUser.officerId}.`
-    });
-
-    if (passkeyDevice) {
-      logActivity({
-        action: 'Device Registered',
-        actionBadge: 'add',
-        details: `Hardware passkey '${passkeyDevice.name}' registered via WebAuthn protocol.`
-      });
-    }
-
-    logActivity({
-      action: 'Role Assigned',
-      actionBadge: 'add',
-      details: `Assigned role '${newUser.roleLabel || 'Police Officer'}' with permissions: [${(permissions || ['Read', 'Upload', 'Edit']).join(', ')}].`
-    });
-
-    showToast(`Officer account registered for ${newUser.name} (${newUser.roleLabel || 'Police Officer'})`, 'success');
-    return newUser;
   };
 
   // Update Officer Profile
@@ -602,72 +617,206 @@ export const AppProvider = ({ children }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Add a new case
-  const addCase = (newCaseData) => {
-    const caseId = generateCaseId(cases.length);
-    const firNumber = newCaseData.firNumber || `FIR-2026-${1025 + cases.length}`;
-    const today = new Date().toISOString().split('T')[0];
-
-    const fullCase = {
-      id: caseId,
-      firNumber,
-      title: newCaseData.title,
-      caseType: newCaseData.caseType || 'Theft',
-      policeStation: newCaseData.policeStation || currentUser?.policeStation || 'Siliguri Police Station',
-      investigatingOfficer: newCaseData.investigatingOfficer || currentUser?.name || 'SI Rahul Das',
-      officerRank: currentUser?.rank || 'Sub-Inspector',
-      createdDate: today,
-      lastUpdated: today,
-      status: 'Investigation',
-      priority: newCaseData.priority || 'Medium',
-      description: newCaseData.description || 'Case opened for investigation.',
-      incidentDate: newCaseData.incidentDate || today,
-      documentCount: 0,
-      tags: [newCaseData.caseType || 'Investigation', 'Active']
-    };
-
-    setCases(prev => [fullCase, ...prev]);
-
-    logActivity({
-      action: 'Case Created',
-      actionBadge: 'create',
-      caseId: fullCase.id,
-      details: `Created new case ${fullCase.id} (${fullCase.firNumber}) - ${fullCase.title}`
-    });
-
-    showToast(`Case ${fullCase.id} created successfully!`, 'success');
-    return fullCase;
-  };
-
-  // Update an existing case
-  const updateCase = (caseId, updatedFields) => {
-    setCases(prev => prev.map(c => {
-      if (c.id === caseId) {
-        return { ...c, ...updatedFields, lastUpdated: new Date().toISOString().split('T')[0] };
+  // Add a new case via Django REST API + MongoDB
+  const addCase = async (newCaseData) => {
+    try {
+      const user = currentUser || (localStorage.getItem('casevault_user') ? JSON.parse(localStorage.getItem('casevault_user')) : null);
+      const headers = { 'Content-Type': 'application/json' };
+      if (user && (user.officer_id || user.officerId)) {
+        headers['X-Officer-ID'] = user.officer_id || user.officerId;
       }
-      return c;
-    }));
+      if (user && user.email) {
+        headers['X-User-Email'] = user.email;
+      }
 
-    logActivity({
-      action: 'Case Updated',
-      actionBadge: 'edit',
-      caseId,
-      details: `Updated case details for ${caseId}`
-    });
+      const payload = {
+        title: newCaseData.title || 'Untitled Case',
+        case_type: newCaseData.caseType || newCaseData.case_type || 'Investigation',
+        description: newCaseData.description || 'Case opened for investigation.',
+        police_station: newCaseData.policeStation || newCaseData.police_station || user?.policeStation || 'Siliguri Police Station',
+        priority: (newCaseData.priority || 'MEDIUM').toUpperCase(),
+        status: newCaseData.status || 'OPEN'
+      };
 
-    showToast(`Case ${caseId} updated successfully!`, 'success');
+      const response = await fetch('http://localhost:8000/api/cases/', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success && data.case) {
+        const c = data.case;
+        const fullCase = {
+          ...c,
+          id: c.case_id || c.id,
+          firNumber: c.fir_number || c.case_id,
+          title: c.title,
+          caseType: c.case_type || 'Investigation',
+          policeStation: c.police_station || 'Siliguri Police Station',
+          investigatingOfficer: c.investigating_officer || c.investigating_officer_id || user?.name || 'Officer',
+          createdDate: c.created_at ? c.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          lastUpdated: c.updated_at ? c.updated_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          status: c.status || 'OPEN',
+          priority: c.priority || 'MEDIUM',
+          description: c.description || '',
+          documentCount: 0,
+          tags: [c.case_type || 'Investigation', c.status || 'OPEN']
+        };
+
+        setCases(prev => [fullCase, ...prev]);
+
+        logActivity({
+          action: 'Case Created',
+          actionBadge: 'create',
+          caseId: fullCase.id,
+          details: `Created case ${fullCase.id} - ${fullCase.title} in MongoDB via Django REST API.`
+        });
+
+        showToast(`Case ${fullCase.id} created successfully!`, 'success');
+        return fullCase;
+      } else {
+        const errMsg = data.message || 'Failed to create case on backend server.';
+        showToast(errMsg, 'error');
+        return null;
+      }
+    } catch (err) {
+      console.error('[CASEVAULT Add Case] API Error:', err);
+      showToast('Network error creating case on backend.', 'error');
+      return null;
+    }
   };
 
-  // Add a new Document
+  // Update an existing case via Django REST API
+  const updateCase = async (caseId, updatedFields) => {
+    try {
+      const user = currentUser || (localStorage.getItem('casevault_user') ? JSON.parse(localStorage.getItem('casevault_user')) : null);
+      const headers = { 'Content-Type': 'application/json' };
+      if (user && (user.officer_id || user.officerId)) {
+        headers['X-Officer-ID'] = user.officer_id || user.officerId;
+      }
+      if (user && user.email) {
+        headers['X-User-Email'] = user.email;
+      }
+
+      const response = await fetch(`http://localhost:8000/api/cases/${caseId}/`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(updatedFields)
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        fetchCasesFromBackend();
+        logActivity({
+          action: 'Case Updated',
+          actionBadge: 'edit',
+          caseId,
+          details: `Updated case ${caseId} via Django API.`
+        });
+        showToast(`Case ${caseId} updated successfully!`, 'success');
+        return data.case;
+      } else {
+        showToast(data.message || `Failed to update case ${caseId}.`, 'error');
+      }
+    } catch (err) {
+      console.error('[CASEVAULT Update Case] API Error:', err);
+      showToast('Error updating case on backend.', 'error');
+    }
+  };
+
+
+  // Add a new Document via Django REST API
   const addDocument = async (docData) => {
-    const docId = generateDocId(documents.length);
     const today = new Date().toISOString().split('T')[0];
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    // Calculate real SHA-256 for the content
     const content = docData.content || `CASEVAULT RECORD - ${docData.name}\nCase: ${docData.caseId}\nUploaded by: ${currentUser?.name}\nTimestamp: ${today} ${time}\nClassification: ${docData.classification || 'Internal'}\n\nDocument details verified and archived under digital chain of custody.`;
-    const computedHash = await computeSHA256(content);
 
+    try {
+      const user = currentUser || (localStorage.getItem('casevault_user') ? JSON.parse(localStorage.getItem('casevault_user')) : null);
+      const headers = {};
+      if (user && (user.officer_id || user.officerId)) {
+        headers['X-Officer-ID'] = user.officer_id || user.officerId;
+      }
+      if (user && user.email) {
+        headers['X-User-Email'] = user.email;
+      }
+
+      const formData = new FormData();
+      const filename = docData.name.endsWith('.pdf') ? docData.name : `${docData.name}.pdf`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      formData.append('file', blob, filename);
+      formData.append('document_type', docData.docType || 'FIR');
+      formData.append('document_name', filename);
+      formData.append('classification', docData.classification || 'Confidential');
+      formData.append('description', docData.description || `Uploaded document for case ${docData.caseId}`);
+
+      const response = await fetch(`http://localhost:8000/api/cases/${docData.caseId}/documents/`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success && data.document) {
+        const d = data.document;
+        const newDoc = {
+          id: d.document_id || d.id,
+          caseId: d.case_id,
+          name: d.file_name || d.document_name,
+          docType: d.document_type,
+          docTypeLabel: d.document_type,
+          version: 1,
+          uploadedBy: d.uploaded_by_name || currentUser?.name || 'Officer',
+          uploadedByRole: currentUser?.roleLabel || 'Police Officer',
+          uploadDate: d.uploaded_at ? d.uploaded_at.split('T')[0] : today,
+          uploadTime: time,
+          classification: d.classification || 'Confidential',
+          status: d.status || 'Verified',
+          sha256: d.sha256,
+          lastVerified: `${today} ${time}`,
+          fileSize: `${Math.round((d.file_size || 500) / 1024)} KB`,
+          pageCount: docData.pageCount || 2,
+          description: d.description || '',
+          content: content,
+          previousVersions: []
+        };
+
+        setDocuments(prev => [newDoc, ...prev]);
+
+        // Update document count in case
+        setCases(prev => prev.map(c => {
+          if (c.id === docData.caseId) {
+            return { ...c, documentCount: (c.documentCount || 0) + 1, lastUpdated: today };
+          }
+          return c;
+        }));
+
+        logActivity({
+          action: 'Uploaded',
+          actionBadge: 'upload',
+          documentId: newDoc.id,
+          documentName: newDoc.name,
+          caseId: docData.caseId,
+          details: `Uploaded ${newDoc.docType}. Generated SHA-256 Checksum: ${newDoc.sha256.substring(0, 12)}...`
+        });
+
+        showToast(`Document ${newDoc.id} uploaded & SHA-256 verified!`, 'success');
+        return newDoc;
+      } else {
+        if (response.status === 409) {
+          showToast(data.message || 'Duplicate file upload attempt with identical SHA-256 hash.', 'error');
+        } else {
+          showToast(data.message || 'Failed to upload document to backend server.', 'error');
+        }
+      }
+    } catch (err) {
+      console.warn('[CASEVAULT Upload] Backend API connection warning:', err);
+    }
+
+    // Local fallback if backend unavailable
+    const docId = generateDocId(documents.length);
+    const computedHash = await computeSHA256(content);
     const newDoc = {
       id: docId,
       caseId: docData.caseId,
@@ -675,7 +824,7 @@ export const AppProvider = ({ children }) => {
       docType: docData.docType || 'FIR',
       docTypeLabel: docData.docType || 'First Information Report (FIR)',
       version: 1,
-      uploadedBy: currentUser?.name || 'SI Rahul Das',
+      uploadedBy: currentUser?.name || 'SI Shivam Kumar Singh',
       uploadedByRole: currentUser?.roleLabel || 'Police Officer',
       uploadDate: today,
       uploadTime: time,
@@ -692,7 +841,6 @@ export const AppProvider = ({ children }) => {
 
     setDocuments(prev => [newDoc, ...prev]);
 
-    // Update document count in case
     setCases(prev => prev.map(c => {
       if (c.id === docData.caseId) {
         return { ...c, documentCount: (c.documentCount || 0) + 1, lastUpdated: today };
@@ -802,66 +950,20 @@ export const AppProvider = ({ children }) => {
   };
 
   // Add new user (Admin action with Duplicate Protection & Audit Trail)
-  const addUser = (userData) => {
-    const cleanEmail = (userData.email || '').trim().toLowerCase();
-    const cleanId = (userData.officerId || '').trim().toLowerCase();
-
-    // Duplicate Check
-    const isDuplicate = users.some(u => 
-      (cleanEmail && (u.email || '').trim().toLowerCase() === cleanEmail) ||
-      (cleanId && (u.officerId || '').trim().toLowerCase() === cleanId)
-    );
-
-    if (isDuplicate) {
-      const err = "Duplicate Officer Detected: An officer with this Officer ID/Badge ID or Email address already exists.";
-      showToast(err, 'error');
-      return { success: false, error: err };
-    }
-
-    const roleLabels = {
-      police_officer: 'Police Officer',
-      senior_officer: 'Senior Officer',
-      legal_officer: 'Legal Officer',
-      administrator: 'Administrator'
-    };
-
-    const newUser = {
-      id: `usr_${Date.now().toString().slice(-4)}`,
-      officerId: userData.officerId || `POL-WB-${Math.floor(1000 + Math.random() * 9000)}`,
+  const addUser = async (userData) => {
+    return await registerOfficer({
+      officerId: userData.officerId,
       name: userData.name,
-      role: userData.role || 'police_officer',
-      roleLabel: roleLabels[userData.role] || 'Police Officer',
-      badge: userData.badge || userData.rank || 'Police Officer',
-      rank: userData.rank || userData.badge || 'Police Officer',
-      policeStation: userData.policeStation || 'Siliguri Police Station',
-      district: userData.district || 'Darjeeling District',
-      email: cleanEmail,
-      password: userData.password || 'Officer@123',
-      phone: userData.phone || '',
-      status: 'Active',
-      createdDate: new Date().toLocaleDateString('en-GB'),
-      lastLogin: 'Never',
-      avatar: userData.avatar || (userData.role === 'senior_officer' ? '👮‍♂️' : userData.role === 'legal_officer' ? '⚖️' : userData.role === 'administrator' ? '🛡️' : '👮')
-    };
-
-    setUsers(prev => [newUser, ...prev]);
-
-    logActivity({
-      action: 'Officer Created',
-      actionBadge: 'add',
-      details: `New officer account created for ${newUser.name} (${newUser.officerId}) by ${currentUser?.name || 'Administrator'}. Role: ${newUser.roleLabel}, Station: ${newUser.policeStation}.`
+      rank: userData.rank || userData.badge,
+      policeStation: userData.policeStation,
+      email: userData.email,
+      phone: userData.phone,
+      role: userData.role,
+      roleLabel: userData.roleLabel,
+      password: userData.password,
+      avatar: userData.avatar,
+      idType: 'Official ID Card'
     });
-
-    if (userData.idCardUploaded) {
-      logActivity({
-        action: 'ID Card Uploaded',
-        actionBadge: 'upload',
-        details: `Official ID Card uploaded & scanned via OCR for ${newUser.name} (${newUser.officerId}).`
-      });
-    }
-
-    showToast(`Officer ${newUser.name} (${newUser.officerId}) created successfully!`, 'success');
-    return { success: true, user: newUser };
   };
 
   // Update existing user (Admin Action)

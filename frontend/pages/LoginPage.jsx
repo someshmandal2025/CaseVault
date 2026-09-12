@@ -256,14 +256,32 @@ export const LoginPage = () => {
   };
 
   const handleConfirmIdDetails = (e) => {
-    e.preventDefault();
-    if (!extractedOfficer.officerId.trim() || !extractedOfficer.name.trim() || !extractedOfficer.rank.trim() || !extractedOfficer.policeStation.trim()) {
-      setErrorMessage('Please fill in all officer ID details before proceeding.');
-      return;
-    }
+    if (e) e.preventDefault();
+    
+    const cat = extractedOfficer.categoryKey || 'police_officer';
+    const name = (extractedOfficer.name || '').trim() || (cat === 'administrator' ? 'Suresh Sah' : 'Officer');
+    const officerId = (extractedOfficer.officerId || '').trim() || (cat === 'administrator' ? 'WB-ADM-0001' : `POL-${Math.floor(1000 + Math.random() * 9000)}`);
+    const rank = (extractedOfficer.rank || '').trim() || getPermittedRanksForCategory(cat)[0];
+    const policeStation = (extractedOfficer.policeStation || '').trim() || (cat === 'administrator' ? 'CASEVAULT Administration' : 'Siliguri Police Station');
+    const email = (extractedOfficer.email || officialEmail || '').trim();
+    const phone = (extractedOfficer.phone || '').trim();
 
-    if (extractedOfficer.email && extractedOfficer.email.trim()) {
-      setOfficialEmail(extractedOfficer.email.trim());
+    const finalOfficer = {
+      ...extractedOfficer,
+      categoryKey: cat,
+      name,
+      officerId,
+      rank,
+      designation: rank,
+      policeStation,
+      email,
+      phone
+    };
+
+    setExtractedOfficer(finalOfficer);
+
+    if (email) {
+      setOfficialEmail(email);
     }
 
     setErrorMessage('');
@@ -271,9 +289,9 @@ export const LoginPage = () => {
     logActivity({
       action: 'Officer ID Verified',
       actionBadge: 'verify',
-      details: `${idType} (${extractedOfficer.officerId}) verified for ${extractedOfficer.name} (${extractedOfficer.rank}, ${extractedOfficer.policeStation}${extractedOfficer.email ? ', Email: ' + extractedOfficer.email : ''}${extractedOfficer.phone ? ', Phone: ' + extractedOfficer.phone : ''}).`
+      details: `${idType} (${officerId}) verified for ${name} (${rank}, ${policeStation}).`
     });
-    showToast(`✓ ID details confirmed for ${extractedOfficer.name} (${extractedOfficer.officerId})`, 'success');
+    showToast(`✓ ID details confirmed for ${name} (${officerId})`, 'success');
     setActiveRegStep('pin');
   };
 
@@ -567,7 +585,7 @@ export const LoginPage = () => {
     }
   };
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-[#F4F6F8] flex flex-col font-sans">
+    <div className="min-h-screen w-full relative overflow-x-hidden bg-[#F4F6F8] flex flex-col font-sans">
       {/* Background Decorative Layer */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 pointer-events-none"
@@ -578,58 +596,59 @@ export const LoginPage = () => {
       />
       {/* Tricolor & Government Overlay */}
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-900/60 via-[#0B2D4D]/50 to-[#164A73]/65 backdrop-blur-[2px] pointer-events-none" />
-      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#FF9933] via-white to-[#138808] z-30 shadow-sm" />
-
-      {/* Top Header Bar */}
-      <header className="relative z-20 w-full px-4 sm:px-8 py-2.5 flex items-center justify-between border-b border-white/15 bg-[#0B2D4D]/80 backdrop-blur-md text-white shrink-0 shadow-sm">
-        <div className="flex items-center gap-3">
-          <IndiaEmblem className="w-8 h-8 filter drop-shadow brightness-110" />
-          <div className="border-l border-white/25 pl-3">
-            <div className="text-[11px] font-bold tracking-wider text-amber-300 uppercase">Government of India</div>
-            <div className="text-xs font-semibold text-slate-200">Ministry of Home Affairs • Police IT Infrastructure</div>
+      {/* Fixed Top Header Bar & Indian Flag Tricolor Border */}
+      <header className="fixed top-0 left-0 right-0 z-50 shadow-md">
+        <div className="h-1.5 bg-gradient-to-r from-[#FF9933] via-white to-[#138808] w-full" />
+        <div className="w-full px-4 sm:px-8 py-2.5 flex items-center justify-between border-b border-white/15 bg-[#0B2D4D]/95 backdrop-blur-md text-white">
+          <div className="flex items-center gap-3">
+            <IndiaEmblem className="w-8 h-8 filter drop-shadow brightness-110" />
+            <div className="border-l border-white/25 pl-3">
+              <div className="text-[11px] font-bold tracking-wider text-amber-300 uppercase">Government of India</div>
+              <div className="text-xs font-semibold text-slate-200">Ministry of Home Affairs • Police IT Infrastructure</div>
+            </div>
           </div>
-        </div>
 
-        {/* Right Tools: Language & Support */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          <div className="relative" ref={langDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsLangOpen(!isLangOpen)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-white transition cursor-pointer"
-            >
-              <Globe className="w-3.5 h-3.5 text-amber-300" />
-              <span>{language}</span>
-              <ChevronDown className="w-3 h-3 text-slate-300" />
-            </button>
-            {isLangOpen && (
-              <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 text-slate-800 text-xs">
-                {['English', 'Hindi (हिन्दी)', 'Bengali (বাংলা)'].map((lang) => (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => {
-                      setLanguage(lang.split(' ')[0]);
-                      setIsLangOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-slate-100 font-medium cursor-pointer"
-                  >
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Right Tools: Language & Support */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="relative" ref={langDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-white transition cursor-pointer"
+              >
+                <Globe className="w-3.5 h-3.5 text-amber-300" />
+                <span>{language}</span>
+                <ChevronDown className="w-3 h-3 text-slate-300" />
+              </button>
+              {isLangOpen && (
+                <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 text-slate-800 text-xs">
+                  {['English', 'Hindi (हिन्दी)', 'Bengali (বাংলা)'].map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => {
+                        setLanguage(lang.split(' ')[0]);
+                        setIsLangOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-slate-100 font-medium cursor-pointer"
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Two-Column Layout Container */}
-      <main className="relative z-10 flex-1 flex flex-col lg:flex-row w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-6 gap-6 items-center justify-center overflow-y-auto lg:overflow-hidden">
+      <main className="relative z-10 flex-1 flex flex-col lg:flex-row w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-6 gap-6 items-center justify-center">
         
         {/* ============================================================ */}
         {/* LEFT COLUMN: Fixed Branding / Role Modules or Registration   */}
         {/* ============================================================ */}
-        <div className="w-full lg:w-5/12 flex flex-col justify-center text-white space-y-4 shrink-0 lg:sticky lg:top-0">
+        <div className="w-full lg:w-5/12 flex flex-col justify-center text-white space-y-4 shrink-0 lg:sticky lg:top-12 self-center">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 ring-2 ring-white/30">
               <ShieldCheck className="w-7 h-7 text-slate-950 font-black" />
@@ -1299,8 +1318,10 @@ export const LoginPage = () => {
 
                 {/* Module 1: 🪪 ID Card OCR & Extraction Screen */}
                 {activeRegStep === 'id_card' && (
-                  <form onSubmit={handleConfirmIdDetails} className="space-y-3.5 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                  <form onSubmit={handleConfirmIdDetails} className="space-y-4 animate-in fade-in duration-150 text-left">
+                    
+                    {/* Step Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                       <div>
                         <div className="text-xs font-bold text-[#0052cc] uppercase tracking-wider">Step 1 of 4</div>
                         <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
@@ -1316,7 +1337,7 @@ export const LoginPage = () => {
                       <select
                         value={idType}
                         onChange={(e) => setIdType(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-800 bg-white"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-800 bg-white focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 shadow-xs transition"
                       >
                         <option value="Police ID">Police ID Card (State / Central)</option>
                         <option value="Government ID">Government Official ID</option>
@@ -1325,29 +1346,29 @@ export const LoginPage = () => {
                     </div>
 
                     {/* Upload Container */}
-                    <div className="border-2 border-dashed border-slate-300 hover:border-[#0052cc] rounded-2xl p-4 bg-slate-50 text-center transition">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-[#0052cc] flex items-center justify-center mx-auto mb-2">
+                    <div className="border-2 border-dashed border-slate-300 hover:border-[#0052cc] rounded-2xl p-4 bg-slate-50/80 text-center transition">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-[#0052cc] flex items-center justify-center mx-auto mb-2 shadow-xs">
                         <UploadCloud className="w-5 h-5" />
                       </div>
                       <div className="text-xs font-bold text-slate-800">Upload Police Badge / ID</div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Upload a clear image of the officer ID</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Upload a clear image of the officer ID card or badge</p>
 
                       <div className="flex items-center justify-center gap-2 mt-3">
                         <button
                           type="button"
                           onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                          className="px-3 py-1.5 rounded-xl bg-[#0052cc] hover:bg-[#0047b3] text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0047b3] text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
                         >
-                          <UploadCloud className="w-3.5 h-3.5" />
+                          <UploadCloud className="w-4 h-4" />
                           <span>Upload ID Image</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
-                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
                         >
-                          <Camera className="w-3.5 h-3.5" />
+                          <Camera className="w-4 h-4" />
                           <span>Take Photo</span>
                         </button>
                       </div>
@@ -1370,24 +1391,27 @@ export const LoginPage = () => {
                       />
                     </div>
 
-                    {/* OCR Status Banner */}
+                    {/* OCR Status Banners */}
                     {ocrStatus === 'reading' && (
-                      <div className="p-3 rounded-xl bg-blue-900/40 border border-blue-500/40 text-blue-200 text-xs font-semibold flex items-center gap-2.5 animate-pulse">
-                        <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center gap-2.5 animate-pulse shadow-xs">
+                        <RefreshCw className="w-4 h-4 animate-spin text-[#0052cc]" />
                         <span>Scanning Identity Card... Please wait while text is parsed.</span>
                       </div>
                     )}
 
                     {ocrStatus === 'success' && (
-                      <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center justify-between gap-2 flex-wrap shadow-xs">
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>Review Extracted Information</span>
+                          <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                          <div>
+                            <div className="font-bold text-emerald-950 text-xs">✓ ID Card Extracted Successfully</div>
+                            <p className="text-[10px] text-emerald-700">Review details below and click Continue to proceed.</p>
+                          </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                          className="text-[11px] font-bold text-amber-300 hover:underline cursor-pointer"
+                          className="text-[11px] font-bold text-[#0052cc] hover:underline cursor-pointer px-2 py-1"
                         >
                           Rescan Card
                         </button>
@@ -1395,42 +1419,58 @@ export const LoginPage = () => {
                     )}
 
                     {ocrStatus === 'error' && (
-                      <div className="p-2.5 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                        <span>{ocrErrorMsg || 'Unable to clearly read the ID text. Please fill in officer details manually.'}</span>
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center gap-2 shadow-xs">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>{ocrErrorMsg || 'Unable to clearly read text. Please review and fill officer details manually.'}</span>
                       </div>
                     )}
 
                     {/* Extracted Officer Photo from ID Badge */}
                     {extractedOfficer.photo && (
-                      <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-left">
+                      <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200 text-left">
                         <img 
                           src={extractedOfficer.photo} 
                           alt="Officer ID Portrait" 
-                          className="w-12 h-14 object-cover rounded-lg border-2 border-emerald-500 shadow-xs shrink-0" 
+                          className="w-12 h-14 object-cover rounded-lg border-2 border-emerald-600 shadow-xs shrink-0" 
                         />
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
                             <span>Official Portrait Scanned from ID Card</span>
                           </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                          <p className="text-[11px] text-slate-600 mt-0.5 truncate">
                             This cropped photo will automatically be assigned as your officer profile picture.
                           </p>
                         </div>
                       </div>
                     )}
 
-                    {/* Extracted Fields Form with Category Auto-Selection & Low Confidence Warning */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-2xl bg-slate-900/60 border border-slate-700/80 text-left backdrop-blur-md">
+                    {/* Section Header */}
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-700 pt-2 border-t border-slate-200">
+                      <span className="flex items-center gap-1.5 text-slate-900">
+                        <span>📋</span> Officer Verification Details
+                      </span>
+                      {ocrStatus === 'success' ? (
+                        <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          ✓ Auto-Filled from ID
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          Fill or edit details manually
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Officer Details Form */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left shadow-xs">
                       
                       {/* 1. Category * */}
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-300 mb-0.5">Category *</label>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Category *</label>
                         <select
                           value={extractedOfficer.categoryKey || 'police_officer'}
                           onChange={(e) => handleRegCategoryChange(e.target.value)}
-                          className="w-full py-1.5 px-3 rounded-xl border border-slate-600 bg-slate-800 text-xs font-bold text-white focus:border-amber-400 cursor-pointer"
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 cursor-pointer transition shadow-2xs"
                         >
                           <option value="police_officer">👮 Officer</option>
                           <option value="senior_officer">⭐ Senior Officer</option>
@@ -1439,22 +1479,13 @@ export const LoginPage = () => {
                         </select>
                       </div>
 
-                      {/* 2. Rank / Designation * (Dynamically Dependent on Category) */}
+                      {/* 2. Rank / Designation * */}
                       <div>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Rank / Designation *</label>
-                          {!ocrConfidence.rank && (
-                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Verify rank
-                            </span>
-                          )}
-                        </div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Rank / Designation *</label>
                         <select
                           value={extractedOfficer.rank || getPermittedRanksForCategory(extractedOfficer.categoryKey)[0]}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, rank: e.target.value, designation: e.target.value })}
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold bg-slate-800 text-white transition cursor-pointer ${
-                            !ocrConfidence.rank ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
-                          }`}
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 cursor-pointer transition shadow-2xs"
                         >
                           {getPermittedRanksForCategory(extractedOfficer.categoryKey || 'police_officer').map((r) => (
                             <option key={r} value={r}>{r}</option>
@@ -1464,83 +1495,49 @@ export const LoginPage = () => {
 
                       {/* 3. Officer Name * */}
                       <div>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Officer Name *</label>
-                          {!ocrConfidence.name && (
-                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Enter name
-                            </span>
-                          )}
-                        </div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Officer Name *</label>
                         <input
                           type="text"
                           required
                           value={extractedOfficer.name}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, name: e.target.value })}
-                          placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. Suresh Sah' : 'e.g. SI Rahul Das'}
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-semibold bg-slate-800 text-white transition ${
-                            !ocrConfidence.name ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
-                          }`}
+                          placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. Suresh Sah' : 'e.g. SI Shivam Kumar Singh'}
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-semibold text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 transition shadow-2xs"
                         />
                       </div>
 
                       {/* 4. Officer Badge / Batch ID * */}
                       <div>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">
-                            {extractedOfficer.categoryKey === 'administrator' ? 'Administrator ID / Badge ID *' : extractedOfficer.categoryKey === 'legal_officer' ? 'Legal Officer ID / Batch ID *' : 'Officer ID / Badge ID *'}
-                          </label>
-                          {!ocrConfidence.officerId && (
-                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Enter ID
-                            </span>
-                          )}
-                        </div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          {extractedOfficer.categoryKey === 'administrator' ? 'Administrator ID / Badge ID *' : extractedOfficer.categoryKey === 'legal_officer' ? 'Legal Officer ID / Batch ID *' : 'Officer ID / Badge ID *'}
+                        </label>
                         <input
                           type="text"
                           required
                           value={extractedOfficer.officerId}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, officerId: e.target.value.toUpperCase() })}
                           placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. WB-ADM-0001' : 'e.g. POL-8842'}
-                          className={`w-full py-1.5 px-3 rounded-xl border font-mono text-xs sm:text-sm font-bold bg-slate-800 text-white transition ${
-                            !ocrConfidence.officerId ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
-                          }`}
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white font-mono text-xs sm:text-sm font-bold text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 transition shadow-2xs"
                         />
                       </div>
 
                       {/* 5. Police Station / Unit / Location */}
                       <div>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">
-                            {extractedOfficer.categoryKey === 'administrator' ? 'Department / Unit / Location' : extractedOfficer.categoryKey === 'legal_officer' ? 'Court / Legal Unit' : 'Police Station / Unit'}
-                          </label>
-                          {!ocrConfidence.policeStation && (
-                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Optional
-                            </span>
-                          )}
-                        </div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          {extractedOfficer.categoryKey === 'administrator' ? 'Department / Unit / Location' : extractedOfficer.categoryKey === 'legal_officer' ? 'Court / Legal Unit' : 'Police Station / Unit'}
+                        </label>
                         <input
                           type="text"
                           value={extractedOfficer.policeStation}
                           onChange={(e) => setExtractedOfficer({ ...extractedOfficer, policeStation: e.target.value })}
                           placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. CASEVAULT Administration' : 'e.g. Siliguri Police Station'}
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-medium bg-slate-800 text-white transition ${
-                            !ocrConfidence.policeStation ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
-                          }`}
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-medium text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 transition shadow-2xs"
                         />
                       </div>
 
                       {/* 6. Official Email * */}
                       <div>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Official Email *</label>
-                          {!ocrConfidence.email && (
-                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Enter email
-                            </span>
-                          )}
-                        </div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Official Email *</label>
                         <input
                           type="email"
                           required
@@ -1550,55 +1547,43 @@ export const LoginPage = () => {
                             setOfficialEmail(e.target.value);
                           }}
                           placeholder={extractedOfficer.categoryKey === 'administrator' ? 'e.g. sureshkumarsah268@gmail.com' : 'e.g. officer@police.gov.in'}
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-medium bg-slate-800 text-white transition ${
-                            !ocrConfidence.email ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
-                          }`}
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-medium text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 transition shadow-2xs"
                         />
                       </div>
 
                       {/* 7. Phone Number (+91 format) */}
                       <div className="sm:col-span-2">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className="text-[11px] font-bold text-slate-300">Phone Number (+91 format)</label>
-                          {!ocrConfidence.phone && (
-                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-amber-400" /> Optional
-                            </span>
-                          )}
-                        </div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Phone Number (+91 format)</label>
                         <input
                           type="tel"
                           value={extractedOfficer.phone}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setExtractedOfficer({ ...extractedOfficer, phone: raw });
-                          }}
+                          onChange={(e) => setExtractedOfficer({ ...extractedOfficer, phone: e.target.value })}
                           placeholder="e.g. +91 74787 54133"
-                          className={`w-full py-1.5 px-3 rounded-xl border text-xs sm:text-sm font-medium bg-slate-800 text-white transition ${
-                            !ocrConfidence.phone ? 'border-amber-400/80 ring-1 ring-amber-400/50 bg-amber-950/20' : 'border-slate-600 focus:border-amber-400'
-                          }`}
+                          className="w-full py-2 px-3 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-medium text-slate-900 focus:border-[#0052cc] focus:ring-2 focus:ring-[#0052cc]/20 transition shadow-2xs"
                         />
                       </div>
                     </div>
 
-                    {/* Action Bar: Edit, Rescan, Continue */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                        className="py-2.5 px-3 rounded-xl border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Rescan Card</span>
-                      </button>
+                    {/* Action Bar */}
+                    <div className="pt-3 pb-1 flex items-center gap-2">
+                      {(idImagePreview || ocrStatus === 'success') && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                          className="py-3 px-4 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Rescan</span>
+                        </button>
+                      )}
 
                       <button
                         type="submit"
                         disabled={ocrStatus === 'reading'}
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-slate-950 font-extrabold text-xs sm:text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                        className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0052cc] to-[#0047b3] hover:from-[#0047b3] hover:to-[#00388e] disabled:opacity-50 text-white font-black text-xs sm:text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
                       >
                         <Check className="w-4 h-4 font-black" />
-                        <span>Continue to Security Step</span>
+                        <span>Continue to Security Step →</span>
                       </button>
                     </div>
                   </form>
@@ -2145,6 +2130,40 @@ export const LoginPage = () => {
           </div>
         </div>
       </main>
+
+      {/* ============================================================ */}
+      {/* FOOTER SECTION FOR LOGIN & REGISTER PAGES                   */}
+      {/* ============================================================ */}
+      <footer className="relative z-20 w-full shrink-0 py-2.5 px-4 sm:px-6 bg-[#0B2D4D]/90 border-t border-white/15 text-slate-300 text-xs backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+          
+          {/* Left: Branding & Compliance Info */}
+          <div className="flex items-center gap-2 font-bold text-white text-xs">
+            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>CASEVAULT</span>
+            <span className="text-[10px] text-slate-300 font-medium border-l border-white/20 pl-2">
+              National Digital Infrastructure Node • Encrypted Chain-of-Custody (BSA 2023 / IPC)
+            </span>
+          </div>
+
+          {/* Center: Security Badge */}
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-200">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 border border-white/15">
+              🔒 256-Bit SHA Encryption
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Operational
+            </span>
+          </div>
+
+          {/* Right: Support Line & Copyright */}
+          <div className="text-[10px] text-slate-300">
+            Helpline: <span className="text-amber-300 font-bold">+91 1800-CASE-VAULT</span> • © 2026 CASEVAULT
+          </div>
+
+        </div>
+      </footer>
     </div>
   );
 };

@@ -40,8 +40,19 @@ export const CaseDetailPage = () => {
     updateCase, 
     showToast, 
     logActivity, 
-    currentUser 
+    currentUser,
+    users = []
   } = useApp();
+
+  const registeredOfficerOptions = Array.from(
+    new Set([
+      ...(currentUser?.name ? [currentUser.name] : []),
+      ...users.map(u => u.name).filter(Boolean),
+      'SI Shivam Kumar Singh',
+      'Insp. Karan Kumar',
+      'SI Somesh Mandal'
+    ])
+  );
 
   const currentCase = cases.find(c => c.id === selectedCaseId) || cases[0];
   const caseDocs = documents.filter(d => d.caseId === currentCase.id);
@@ -66,17 +77,17 @@ export const CaseDetailPage = () => {
   const [notes, setNotes] = useState([
     {
       id: 'note-1',
-      author: 'Inspector Sharma',
+      author: 'Insp. Karan Kumar',
       role: 'Station House Officer',
       time: 'Today — 11:15 AM',
       text: 'Awaiting fingerprint comparison certificate from SFSL Kolkata.'
     },
     {
       id: 'note-2',
-      author: 'SI Rahul Das',
+      author: 'SI Shivam Kumar Singh',
       role: 'Investigating Officer',
       time: '28 Aug 2026 — 03:30 PM',
-      text: 'Accused Ramesh interrogated under Section 27. Stolen articles recovered.'
+      text: 'Accused interrogated under Section 27. Stolen evidence items recovered.'
     }
   ]);
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
@@ -100,8 +111,21 @@ export const CaseDetailPage = () => {
   // Handle Save Case Updates
   const handleSaveCaseUpdates = (e) => {
     e.preventDefault();
+    const oldIO = currentCase.investigatingOfficer;
+    const newIO = editFormData.investigatingOfficer;
+
     updateCase(currentCase.id, editFormData);
     setIsUpdateModalOpen(false);
+
+    if (oldIO && newIO && oldIO !== newIO) {
+      logActivity({
+        action: 'Reassigned',
+        actionBadge: 'edit',
+        caseId: currentCase.id,
+        details: `Investigating Officer for case ${currentCase.id} reassigned from "${oldIO}" to "${newIO}" by ${currentUser?.name || 'Administrator'}.`
+      });
+      showToast(`Investigating Officer reassigned to ${newIO}`, 'success');
+    }
   };
 
   // Handle Add Note
@@ -201,8 +225,19 @@ export const CaseDetailPage = () => {
           </div>
 
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Investigating Officer:</span>
-            <span className="font-semibold text-slate-800 flex items-center gap-1">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Investigating Officer:</span>
+              <button
+                type="button"
+                onClick={() => setIsUpdateModalOpen(true)}
+                className="text-[10px] font-bold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Click to reassign Investigating Officer"
+              >
+                <Edit3 className="w-2.5 h-2.5" />
+                <span>Reassign</span>
+              </button>
+            </div>
+            <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
               <User className="w-3.5 h-3.5 text-blue-900 shrink-0" />
               <span className="truncate">{currentCase.investigatingOfficer}</span>
             </span>
@@ -454,19 +489,19 @@ export const CaseDetailPage = () => {
               <div className="relative pl-3">
                 <div className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-blue-900"></div>
                 <div className="text-slate-400 text-[10px] font-bold">Today — 10:42 AM</div>
-                <div className="text-slate-800 font-medium">Inspector Sharma viewed FIR_1024.pdf</div>
+                <div className="text-slate-800 font-medium">Insp. Karan Kumar viewed FIR_1024.pdf</div>
               </div>
 
               <div className="relative pl-3">
                 <div className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-600"></div>
                 <div className="text-slate-400 text-[10px] font-bold">Today — 10:30 AM</div>
-                <div className="text-slate-800 font-medium">SI Rahul Das uploaded Investigation_Report.pdf</div>
+                <div className="text-slate-800 font-medium">SI Shivam Kumar Singh uploaded Investigation_Report.pdf</div>
               </div>
 
               <div className="relative pl-3">
                 <div className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-amber-500"></div>
                 <div className="text-slate-400 text-[10px] font-bold">Yesterday — 04:15 PM</div>
-                <div className="text-slate-800 font-medium">Inspector Sharma updated case information</div>
+                <div className="text-slate-800 font-medium">Insp. Karan Kumar updated case information</div>
               </div>
             </div>
           </div>
@@ -714,13 +749,47 @@ export const CaseDetailPage = () => {
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Investigating Officer (I.O.)</label>
-                <input
-                  type="text"
-                  value={editFormData.investigatingOfficer}
-                  onChange={(e) => setEditFormData({ ...editFormData, investigatingOfficer: e.target.value })}
-                  placeholder="e.g. Inspector Sharma"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    list="registered-io-list-casedetail"
+                    value={editFormData.investigatingOfficer}
+                    onChange={(e) => setEditFormData({ ...editFormData, investigatingOfficer: e.target.value })}
+                    placeholder="Select or enter Officer name..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold"
+                  />
+                  <datalist id="registered-io-list-casedetail">
+                    {registeredOfficerOptions.map((offName, idx) => (
+                      <option key={idx} value={offName} />
+                    ))}
+                  </datalist>
+                </div>
+                {registeredOfficerOptions.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1 items-center">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Registered Officers:</span>
+                    {registeredOfficerOptions.map((offName, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          const matchedUser = users.find(u => u.name === offName);
+                          setEditFormData(prev => ({
+                            ...prev,
+                            investigatingOfficer: offName,
+                            policeStation: matchedUser?.policeStation || prev.policeStation
+                          }));
+                        }}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition active:scale-95 cursor-pointer ${
+                          editFormData.investigatingOfficer === offName
+                            ? 'bg-blue-900 text-white border-blue-950 shadow-xs'
+                            : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200'
+                        }`}
+                      >
+                        + {offName}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

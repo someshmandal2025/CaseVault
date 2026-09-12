@@ -9,37 +9,87 @@ class UserSerializer(serializers.ModelSerializer):
     officerId = serializers.CharField(source='officer_id', read_only=True)
     badgeNumber = serializers.CharField(source='officer_id', read_only=True)
     badge_number = serializers.CharField(source='officer_id', read_only=True)
+    full_name = serializers.CharField(source='name', read_only=True)
     policeStation = serializers.CharField(source='police_station', read_only=True)
     police_station = serializers.CharField(read_only=True)
+    category = serializers.CharField(source='role', read_only=True)
     roleLabel = serializers.CharField(source='role_label', read_only=True)
     role_label = serializers.CharField(read_only=True)
+    phone_number = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField(source='date_joined', read_only=True)
+    updated_at = serializers.DateTimeField(source='date_joined', read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id',
-            'officerId',
             'officer_id',
-            'badgeNumber',
+            'officerId',
             'badge_number',
+            'badgeNumber',
             'name',
+            'full_name',
             'email',
+            'phone_number',
             'rank',
-            'policeStation',
             'police_station',
+            'policeStation',
             'district',
+            'category',
             'role',
-            'roleLabel',
             'role_label',
+            'roleLabel',
             'status',
-            'avatar'
+            'avatar',
+            'created_at',
+            'updated_at'
         ]
 
+    def get_phone_number(self, obj):
+        return getattr(obj, 'phone', '') or ''
+
+
 VALID_ROLE_RANKS = {
-    'police_officer': {'Constable', 'Head Constable', 'ASI', 'Assistant Sub-Inspector', 'SI', 'Sub-Inspector', 'Police Officer'},
-    'senior_officer': {'Inspector', 'Police Inspector', 'Senior Officer (SHO)', 'ACP / DSP', 'ACP', 'DSP', 'Deputy Superintendent of Police', 'Addl. SP', 'Additional Superintendent of Police', 'SP / SSP', 'SP', 'SSP', 'Superintendent of Police', 'DIG', 'Deputy Inspector General', 'IG', 'Inspector General', 'Inspector General of Police', 'ADGP', 'Additional Director General of Police', 'DGP', 'Director General of Police', 'IPS', 'IPS Officer'},
-    'legal_officer': {'Legal Officer', 'Public Prosecutor', 'Assistant Public Prosecutor (APP)', 'Asst. Public Prosecutor (APP)', 'Assistant Public Prosecutor', 'APP', 'Legal Advisor', 'Law Officer'},
+    'police_officer': {'Constable', 'Head Constable', 'ASI', 'SI'},
+    'senior_officer': {'Inspector', 'ACP / DSP', 'Addl. SP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP'},
+    'legal_officer': {'Legal Officer', 'Public Prosecutor', 'Legal Advisor', 'Law Officer'},
     'administrator': {'System Administrator', 'Administrative Officer', 'Department Administrator', 'IT / System Manager'}
+}
+
+RANK_NORMALIZATION = {
+    'sub-inspector': 'SI',
+    'sub inspector': 'SI',
+    'assistant sub-inspector': 'ASI',
+    'assistant sub inspector': 'ASI',
+    'head constable': 'Head Constable',
+    'acp': 'ACP / DSP',
+    'dsp': 'ACP / DSP',
+    'additional sp': 'Addl. SP',
+    'addl sp': 'Addl. SP',
+    'sp': 'SP / SSP',
+    'ssp': 'SP / SSP',
+    'superintendent of police': 'SP / SSP',
+    'app': 'Public Prosecutor',
+    'assistant public prosecutor': 'Public Prosecutor',
+    'asst. public prosecutor': 'Public Prosecutor',
+    'it manager': 'IT / System Manager',
+    'system manager': 'IT / System Manager',
+    'inspector': 'Inspector',
+    'constable': 'Constable',
+    'asi': 'ASI',
+    'si': 'SI',
+    'dgp': 'DGP',
+    'adgp': 'ADGP',
+    'ig': 'IG',
+    'dig': 'DIG',
+    'legal officer': 'Legal Officer',
+    'public prosecutor': 'Public Prosecutor',
+    'legal advisor': 'Legal Advisor',
+    'law officer': 'Law Officer',
+    'system administrator': 'System Administrator',
+    'administrative officer': 'Administrative Officer',
+    'department administrator': 'Department Administrator',
+    'it / system manager': 'IT / System Manager'
 }
 
 ROLE_CATEGORY_ALIAS = {
@@ -56,21 +106,29 @@ ROLE_CATEGORY_ALIAS = {
     'admin': 'administrator'
 }
 
+
 class RegisterSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=150)
+    name = serializers.CharField(max_length=150, required=False)
+    full_name = serializers.CharField(max_length=150, required=False)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
-    confirm_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, required=False)
     officer_id = serializers.CharField(max_length=50, required=False, allow_blank=True)
-    rank = serializers.CharField(max_length=100, required=False, default='Police Officer')
+    badge_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    rank = serializers.CharField(max_length=100, required=False, default='Constable')
     police_station = serializers.CharField(max_length=150, required=False, default='Siliguri Police Station')
-    role = serializers.CharField(max_length=50, required=False, default='police_officer')
+    role = serializers.CharField(max_length=50, required=False)
+    category = serializers.CharField(max_length=50, required=False)
+    phone_number = serializers.CharField(max_length=30, required=False, allow_blank=True)
     avatar = serializers.CharField(required=False, allow_blank=True)
 
     def validate_email(self, value):
         norm_email = value.lower().strip()
         if User.objects.filter(email=norm_email).exists():
-            raise serializers.ValidationError("An officer account with this email already exists.")
+            raise serializers.ValidationError({
+                "code": "DUPLICATE_EMAIL",
+                "message": "An account with this email already exists."
+            })
         return norm_email
 
     def validate_officer_id(self, value):
@@ -78,32 +136,52 @@ class RegisterSerializer(serializers.Serializer):
             return value
         norm_id = value.strip().upper()
         if User.objects.filter(officer_id__iexact=norm_id).exists():
-            raise serializers.ValidationError("An officer account with this Officer ID / Badge ID already exists.")
+            raise serializers.ValidationError({
+                "code": "DUPLICATE_OFFICER_ID",
+                "message": "An officer with this Officer ID already exists."
+            })
         return norm_id
 
     def validate(self, data):
-        if data.get('password') != data.get('confirm_password'):
+        officer_name = data.get('full_name') or data.get('name')
+        if not officer_name:
+            raise serializers.ValidationError({"name": "Full name is required."})
+        data['name'] = officer_name
+
+        confirm_pass = data.get('confirm_password')
+        if confirm_pass and data.get('password') != confirm_pass:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
 
-        raw_role = (data.get('role') or 'police_officer').strip().lower()
+        raw_role = (data.get('category') or data.get('role') or 'police_officer').strip().lower()
         role_key = ROLE_CATEGORY_ALIAS.get(raw_role, raw_role)
-        rank = (data.get('rank') or '').strip()
+        raw_rank = (data.get('rank') or 'Constable').strip()
+        norm_rank = RANK_NORMALIZATION.get(raw_rank.lower(), raw_rank)
 
         if role_key not in VALID_ROLE_RANKS:
-            raise serializers.ValidationError({"role": f"Invalid category '{data.get('role')}'. Must be Officer, Senior Officer, Legal Officer, or Administrator."})
+            raise serializers.ValidationError({
+                "code": "INVALID_ROLE_RANK",
+                "message": f"Invalid Category '{raw_role}'."
+            })
 
         allowed_ranks = VALID_ROLE_RANKS[role_key]
-        if rank and rank not in allowed_ranks:
-            role_display = role_key.replace('_', ' ').title()
+        if norm_rank and norm_rank not in allowed_ranks:
             raise serializers.ValidationError({
-                "rank": f"Invalid Rank/Designation '{rank}' for Category '{role_display}'."
+                "code": "INVALID_ROLE_RANK",
+                "message": "Invalid Category and Rank combination."
             })
 
         data['role'] = role_key
+        data['rank'] = norm_rank
+        data['officer_id'] = data.get('officer_id') or data.get('badge_number') or ''
         return data
 
     def create(self, validated_data):
-        validated_data.pop('confirm_password')
+        validated_data.pop('confirm_password', None)
+        validated_data.pop('full_name', None)
+        validated_data.pop('category', None)
+        validated_data.pop('badge_number', None)
+        validated_data.pop('phone_number', None)
+
         password = validated_data.pop('password')
         email = validated_data.get('email')
         
@@ -121,7 +199,7 @@ class RegisterSerializer(serializers.Serializer):
             email=email,
             name=validated_data.get('name'),
             officer_id=officer_id,
-            rank=validated_data.get('rank', 'Police Officer'),
+            rank=validated_data.get('rank', 'Constable'),
             police_station=validated_data.get('police_station', 'Siliguri Police Station'),
             role=validated_data.get('role', 'police_officer'),
             role_label=validated_data.get('role', 'police_officer').replace('_', ' ').title(),
@@ -133,11 +211,12 @@ class RegisterSerializer(serializers.Serializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.CharField()
+    identifier = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        credential = data.get('email', '').strip()
+        credential = (data.get('identifier') or data.get('email') or '').strip()
         password = data.get('password', '')
 
         if not credential:
@@ -151,47 +230,70 @@ class LoginSerializer(serializers.Serializer):
         ).first()
 
         if not user:
-            raise serializers.ValidationError("Invalid credentials. Officer account not found.")
+            raise serializers.ValidationError({
+                "code": "INVALID_CREDENTIALS",
+                "message": "Invalid credentials."
+            })
 
         if not user.check_password(password):
-            raise serializers.ValidationError("Invalid credentials. Incorrect password.")
+            raise serializers.ValidationError({
+                "code": "INVALID_CREDENTIALS",
+                "message": "Invalid credentials."
+            })
 
         if user.status == 'Disabled' or not user.is_active:
-            raise serializers.ValidationError("This officer account is deactivated. Contact Administrator.")
+            raise serializers.ValidationError({
+                "code": "ACCOUNT_DISABLED",
+                "message": "Account is disabled."
+            })
 
         data['user'] = user
         return data
 
 
 class ForgotPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    identifier = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        val = (data.get('identifier') or data.get('email') or '').strip()
+        if not val:
+            raise serializers.ValidationError("Email or Officer ID is required.")
+        data['clean_identifier'] = val
+        return data
 
 
 class VerifyOTPSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    identifier = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
     otp = serializers.CharField(min_length=6, max_length=6)
+
+    def validate(self, data):
+        val = (data.get('identifier') or data.get('email') or '').strip()
+        if not val:
+            raise serializers.ValidationError("Email or Officer ID is required.")
+        data['clean_identifier'] = val
+        return data
 
 
 class ResetPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=False)
+    identifier = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
     otp = serializers.CharField(required=False, min_length=6, max_length=6)
     token = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False)
     new_password = serializers.CharField(write_only=True, required=False)
-    confirm_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True, required=False)
 
     def validate(self, data):
-        pass_val = data.get('password') or data.get('new_password')
-        confirm_val = data.get('confirm_password')
-
+        pass_val = data.get('new_password') or data.get('password')
         if not pass_val:
-            raise serializers.ValidationError({"password": "Password field is required."})
-
-        if pass_val != confirm_val:
-            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+            raise serializers.ValidationError({"password": "New password field is required."})
 
         if len(pass_val) < 8:
             raise serializers.ValidationError({"password": "Password must be at least 8 characters long."})
 
         data['clean_password'] = pass_val
+        data['clean_identifier'] = (data.get('identifier') or data.get('email') or '').strip()
         return data
+

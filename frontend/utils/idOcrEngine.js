@@ -294,11 +294,11 @@ export const generateSampleBadgeCardFile = (sampleType = 'si_rahul') => {
 
   let badgeData = {
     badgeId: 'WB-SM-4004',
-    name: 'Rahul Das',
+    name: 'Shivam Kumar Singh',
     rank: 'Sub-Inspector',
     policeStation: 'Siliguri Police Station',
     state: 'WEST BENGAL POLICE',
-    email: 'rahul.das@police.wb.gov.in',
+    email: 'shivam.singh@police.wb.gov.in',
     phone: '+91 98302 34568',
     color: '#0B2D4D',
     uniformColor: '#A07844',

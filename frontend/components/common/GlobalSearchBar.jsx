@@ -124,7 +124,7 @@ export const GlobalSearchBar = ({ placeholder = "Search case, FIR no., document,
     }).slice(0, 3);
 
     // 3. Officers Matching
-    const allOfficers = ['Inspector Sharma', 'SI Rahul Das', 'SI Megha Sen', 'Adv. Ananya Roy', 'Rajesh Verma, IPS'];
+    const allOfficers = ['SI Shivam Kumar Singh', 'Insp. Karan Kumar', 'SI Somesh Mandal', 'Adv. Ananya Roy'];
     officerMatches = allOfficers.filter(o => o.toLowerCase().includes(cleanQ)).slice(0, 2);
   }
 

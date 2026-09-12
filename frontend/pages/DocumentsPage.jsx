@@ -373,10 +373,9 @@ export const DocumentsPage = () => {
               className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white"
             >
               <option value="All">All Officers</option>
-              <option value="Rahul Das">SI Rahul Das</option>
-              <option value="Sharma">Inspector Sharma</option>
-              <option value="Megha Sen">SI Megha Sen</option>
-              <option value="Ananya Roy">Adv. Ananya Roy</option>
+              <option value="Shivam Kumar Singh">SI Shivam Kumar Singh</option>
+              <option value="Karan Kumar">Insp. Karan Kumar</option>
+              <option value="Somesh Mandal">SI Somesh Mandal</option>
             </select>
           </div>
 

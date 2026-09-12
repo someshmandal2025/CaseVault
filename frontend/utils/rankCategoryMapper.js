@@ -14,25 +14,25 @@ export const CATEGORY_MAP = {
     label: 'Officer',
     badgeIcon: '👮',
     badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    ranks: ['Constable', 'Head Constable', 'ASI', 'SI', 'Sub-Inspector']
+    ranks: ['Constable', 'Head Constable', 'ASI', 'SI']
   },
   senior_officer: {
     label: 'Senior Officer',
     badgeIcon: '⭐',
     badgeClass: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-    ranks: ['Inspector', 'ACP', 'DSP', 'ACP / DSP', 'Addl. SP', 'Additional SP', 'SP', 'SSP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP', 'IPS']
+    ranks: ['Inspector', 'ACP / DSP', 'Addl. SP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP']
   },
   legal_officer: {
     label: 'Legal Officer',
     badgeIcon: '⚖️',
     badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    ranks: ['Legal Officer', 'Public Prosecutor', 'Assistant Public Prosecutor (APP)', 'Legal Advisor', 'Law Officer']
+    ranks: ['Legal Officer', 'Public Prosecutor', 'Legal Advisor', 'Law Officer']
   },
   administrator: {
     label: 'Administrator',
     badgeIcon: '🛡️',
     badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    ranks: ['System Administrator', 'Administrative Officer', 'Department Administrator', 'IT Manager', 'IT / System Manager']
+    ranks: ['System Administrator', 'Administrative Officer', 'Department Administrator', 'IT / System Manager']
   }
 };
 
@@ -57,8 +57,8 @@ export const normalizeCategoryKey = (catInput) => {
 export const getPermittedRanksForCategory = (categoryInput) => {
   const key = normalizeCategoryKey(categoryInput);
   if (key === 'police_officer') return ['Constable', 'Head Constable', 'ASI', 'SI'];
-  if (key === 'senior_officer') return ['Inspector', 'ACP / DSP', 'Addl. SP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP', 'IPS'];
-  if (key === 'legal_officer') return ['Legal Officer', 'Public Prosecutor', 'Assistant Public Prosecutor (APP)', 'Legal Advisor', 'Law Officer'];
+  if (key === 'senior_officer') return ['Inspector', 'ACP / DSP', 'Addl. SP', 'SP / SSP', 'DIG', 'IG', 'ADGP', 'DGP'];
+  if (key === 'legal_officer') return ['Legal Officer', 'Public Prosecutor', 'Legal Advisor', 'Law Officer'];
   if (key === 'administrator') return ['System Administrator', 'Administrative Officer', 'Department Administrator', 'IT / System Manager'];
   return ['Constable', 'Head Constable', 'ASI', 'SI'];
 };
@@ -101,7 +101,7 @@ export const mapRankToCategoryAndRank = (rawRank) => {
 
   // 2. LEGAL OFFICER Category
   if (/(?:asst\.?\s*public\s*prosecutor|assistant\s*public\s*prosecutor|\bapp\b)/i.test(lower)) {
-    return { categoryKey: 'legal_officer', categoryLabel: 'Legal Officer', rank: 'Assistant Public Prosecutor (APP)' };
+    return { categoryKey: 'legal_officer', categoryLabel: 'Legal Officer', rank: 'Public Prosecutor' };
   }
   if (/(?:public\s*prosecutor|\bpp\b)/i.test(lower)) {
     return { categoryKey: 'legal_officer', categoryLabel: 'Legal Officer', rank: 'Public Prosecutor' };
@@ -118,7 +118,7 @@ export const mapRankToCategoryAndRank = (rawRank) => {
 
   // 3. SENIOR OFFICER Category
   if (/\bips\b|indian\s*police\s*service/i.test(lower)) {
-    return { categoryKey: 'senior_officer', categoryLabel: 'Senior Officer', rank: 'IPS' };
+    return { categoryKey: 'senior_officer', categoryLabel: 'Senior Officer', rank: 'SP / SSP' };
   }
   if (/\bdgp\b|director\s*general/i.test(lower)) {
     return { categoryKey: 'senior_officer', categoryLabel: 'Senior Officer', rank: 'DGP' };
